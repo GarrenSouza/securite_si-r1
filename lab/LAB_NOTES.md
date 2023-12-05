@@ -118,7 +118,23 @@ config.vm.network "private_network", ip: "192.168.56.4",
 - user and password for Kali are 'vagrant' and 'vagrant' by the time of this writing (default at first startup)
 - next tasks:
     - start report (preferably in latex)
-    - push code to repo
+    - push code to repo (OK)
     - learn how to instantiate vm with graphic environment and anchor it to the host display
     - instantiate attacker's vm through vagrant and include the file in the repository
     - reassess tasks
+
+# dec 5th, 2023
+- The understanding of the exploit is even better
+- At this point I managed to find the source code for the stager (the piece of software that sets up the reverse tcp) and the code that sets up the shell
+- the code for the stager (in the case of linux) can be found [here](https://github.com/rapid7/metasploit-framework/blob/master/lib/msf/core/payload/linux/x64/reverse_tcp_x64.rb#L12) and the code for the shell provisioning can be found [here](https://github.com/rapid7/metasploit-framework/blob/master/modules/payloads/stages/linux/x64/shell.rb)
+- we can also intercept the files along the way by listening to the packets, dumping the text to hex + ascii and then [translating the hex into binary files](https://tomeko.net/online_tools/hex_to_file.php?lang=en), to only then try and dump the binaries as assembly code. The stager is an .elf file and can be disassembled through IDA Pro (the trial version), though the payload itself (the shell provisioner) can be disassembled through the use of objdump:
+    - ```objdump -D -b binary -m i8086 <binary-file>```
+- so from a high level, the steps are as follows:
+    1. We send an exception response message to the broker using OpenWire
+    2. This message allows us to instantiate an xml context by indicating an URI that points to the attacker machine at a specific port
+    3. At construction time, the class is going to fetch from this URI in order to initialize its context
+    4. We are going to provide an xml that instantiates a ProcessBuilder that launches a call to curl
+    5. This curl call fetches a file from the attacker, set it as executable and runs it
+    6. This file is the stager and is meant to setup an outbound TCP connection that reaches for the attacker host
+    7. After connecting with the attacker the victim is going to receive the payload for the exploit, which is machine code to execute the shell and do the stdin and stdout setup in order to bridge the attacker into the shell under the victims system
+
